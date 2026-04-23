@@ -5,16 +5,17 @@ import sys
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
-from graphify.security import sanitize_label
+from graphify.security import sanitize_label, validate_graph_path
 
 
 def _load_graph(graph_path: str) -> nx.Graph:
     try:
-        resolved = Path(graph_path).resolve()
+        # validate_graph_path resolves path and ensures it's inside graphify-out/
+        # base defaults to Path("graphify-out") relative to CWD.
+        resolved = validate_graph_path(graph_path)
         if resolved.suffix != ".json":
             raise ValueError(f"Graph path must be a .json file, got: {graph_path!r}")
-        if not resolved.exists():
-            raise FileNotFoundError(f"Graph file not found: {resolved}")
+        
         safe = resolved
         data = json.loads(safe.read_text(encoding="utf-8"))
         try:

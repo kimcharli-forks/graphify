@@ -165,11 +165,10 @@ function showInfo(nodeId) {{
   if (!n) return;
   const neighborIds = network.getConnectedNodes(nodeId);
   const neighborItems = neighborIds.map(nid => {{
-    const nb = nodesDS.get(nid);
-    const color = nb ? nb.color.background : '#555';
-    return `<span class="neighbor-link" style="border-left-color:${{esc(color)}}" onclick="focusNode(${{JSON.stringify(nid)}})">${{esc(nb ? nb.label : nid)}}</span>`;
-  }}).join('');
-  document.getElementById('info-content').innerHTML = `
+  const nb = nodesDS.get(nid);
+  const color = nb ? nb.color.background : '#555';
+  return `<span class="neighbor-link" style="border-left-color:${{esc(color)}}" onclick="focusNode(${{esc(JSON.stringify(nid))}})">${{esc(nb ? nb.label : nid)}}</span>`;
+  }}).join('');  document.getElementById('info-content').innerHTML = `
     <div class="field"><b>${{esc(n.label)}}</b></div>
     <div class="field">Type: ${{esc(n._file_type || 'unknown')}}</div>
     <div class="field">Community: ${{esc(n._community_name)}}</div>
@@ -563,15 +562,19 @@ def to_obsidian(
 
         lines: list[str] = []
 
+        # Helper to escape double quotes for YAML
+        def y(s):
+            return str(s or "").replace("\\", "\\\\").replace('"', '\\"')
+
         # YAML frontmatter - readable in Obsidian's properties panel
         lines += [
             "---",
-            f'source_file: "{data.get("source_file", "")}"',
-            f'type: "{ftype}"',
-            f'community: "{community_name}"',
+            f'source_file: "{y(data.get("source_file"))}"',
+            f'type: "{y(ftype)}"',
+            f'community: "{y(community_name)}"',
         ]
         if data.get("source_location"):
-            lines.append(f'location: "{data["source_location"]}"')
+            lines.append(f'location: "{y(data["source_location"])}"')
         # Add tags list to frontmatter
         lines.append("tags:")
         for tag in node_tags:

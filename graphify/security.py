@@ -94,6 +94,10 @@ def safe_fetch(url: str, max_bytes: int = _MAX_FETCH_BYTES, timeout: int = 30) -
     - Non-2xx status raises urllib.error.HTTPError
     - Network errors propagate as urllib.error.URLError / OSError
 
+    NOTE: vulnerable to DNS rebinding if the hostname resolves to a safe IP
+    during validation and a private IP during fetch. Enforcement of the validated
+    IP is not implemented here due to complexity of standard library SSL SNI handling.
+
     Raises:
         ValueError        - disallowed scheme or redirect target
         urllib.error.HTTPError  - non-2xx HTTP status
@@ -153,13 +157,9 @@ def validate_graph_path(path: str | Path, base: Path | None = None) -> Path:
         FileNotFoundError - resolved path does not exist
     """
     if base is None:
-        resolved_hint = Path(path).resolve()
-        for candidate in [resolved_hint, *resolved_hint.parents]:
-            if candidate.name == "graphify-out":
-                base = candidate
-                break
-        if base is None:
-            base = Path("graphify-out").resolve()
+        # DO NOT try to derive base from path (bypassable).
+        # Use a fixed location relative to CWD.
+        base = Path("graphify-out")
 
     base = base.resolve()
     if not base.exists():
@@ -170,6 +170,7 @@ def validate_graph_path(path: str | Path, base: Path | None = None) -> Path:
 
     resolved = Path(path).resolve()
     try:
+        # relative_to raises ValueError if path is not subpath of base
         resolved.relative_to(base)
     except ValueError:
         raise ValueError(
@@ -184,17 +185,17 @@ def validate_graph_path(path: str | Path, base: Path | None = None) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Label sanitisation (mirrors code-review-graph's _sanitize_name pattern)
+# Label sanitisation
 # ---------------------------------------------------------------------------
 
-_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _MAX_LABEL_LEN = 256
 
 
 def sanitize_label(text: str | None) -> str:
     """Strip control characters and cap length.
 
-    Safe for embedding in JSON data (inside <script> tags) and plain text.
+    Note: This is intended to prevent text/terminal injection and UI breakage.
     For direct HTML injection, wrap the result with html.escape().
     """
     if text is None:

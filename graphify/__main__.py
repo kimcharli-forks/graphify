@@ -922,11 +922,11 @@ def _clone_repo(url: str, branch: str | None = None, out_dir: Path | None = None
 
     # Normalise URL — strip trailing .git if present
     url = url.rstrip("/")
-    if not url.endswith(".git"):
-        git_url = url + ".git"
-    else:
+    if url.endswith(".git"):
         git_url = url
         url = url[:-4]
+    else:
+        git_url = url + ".git"
 
     # Extract owner/repo from URL
     m = _re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", url)
@@ -934,6 +934,22 @@ def _clone_repo(url: str, branch: str | None = None, out_dir: Path | None = None
         print(f"error: not a recognised GitHub URL: {url}", file=sys.stderr)
         sys.exit(1)
     owner, repo = m.group(1), m.group(2)
+
+    # Security check: owner and repo should not contain path traversal characters
+    # GitHub usernames/repos are alphanumeric plus dots, dashes, and underscores.
+    if _re.search(r"[^a-zA-Z0-9._-]", owner) or _re.search(r"[^a-zA-Z0-9._-]", repo) or ".." in owner or ".." in repo:
+        print(f"error: invalid characters in repo owner or name: {owner}/{repo}", file=sys.stderr)
+        sys.exit(1)
+
+    if branch:
+        # Security check: branch should not start with - to prevent flag injection
+        if branch.startswith("-"):
+            print(f"error: branch name cannot start with '-': {branch!r}", file=sys.stderr)
+            sys.exit(1)
+        # Also limit allowed characters for branch name
+        if _re.search(r"[^a-zA-Z0-9./_-]", branch) or ".." in branch:
+             print(f"error: invalid characters in branch name: {branch!r}", file=sys.stderr)
+             sys.exit(1)
 
     if out_dir:
         dest = out_dir
